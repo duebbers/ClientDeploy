@@ -63,3 +63,4 @@ _deploy/
 _pack/
 Ident-Plus/Properties/Assemblyinfo.gen.cs
 *.DotSettings
+_drafts/
