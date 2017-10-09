@@ -1,0 +1,65 @@
+#################
+## Visual Studio
+#################
+
+# User-specific files
+*.suo
+*.user
+*.sln.docstates
+.vs/
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+[Pp]ackages/
+[Ss]olutionDeployment/
+*_i.c
+*_p.c
+*.ilk
+*.meta
+*.obj
+*.pch
+*.pdb
+*.pgc
+*.pgd
+*.rsp
+*.sbr
+*.tlb
+*.tli
+*.tlh
+*.tmp
+*.vspscc
+.builds
+*.dotCover
+*.exe
+*vshost*
+*.log
+
+# Office Temp Files
+~$*
+
+# ReSharper is a .NET coding add-in
+_ReSharper*/
+*.resharper
+_dotCover*
+
+# Others
+[Bb]in
+[Oo]bj
+
+############
+## Windows
+############
+
+# Windows image file caches
+Thumbs.db
+
+# Folder config file
+Desktop.ini
+_build_tools/
+Version.gen.cs
+.fake/
+_deploy/
+_pack/
+Ident-Plus/Properties/Assemblyinfo.gen.cs
+*.DotSettings
