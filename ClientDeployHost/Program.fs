@@ -95,15 +95,13 @@ let main argv =
 
   let app =
     choose
-      [ GET >=> path "/" >=> OK "<h1>ClientDeploy Repository</h1><a href='/repo'>Repository Overview</a>"
+      [ GET >=> path "/" >=> OK "<h1>ClientDeploy Repository</h1><a href='/repo'>Repository Description</a>"
         GET >=> path "/repo" >=>  jsonResponse ({ RepositoryDescription.APIv1=(sprintf "%s/apiv1" absolutebase) ; CanonicalBaseUrl = absolutebase })
         GET >=> path "/apiv1" >=>  jsonResponse ({ RepositoryAPIv1.UpdaterUrl=null ; ChannelListUrl=(sprintf "%s/channels" absolutebase) })
         GET >=> path "/channels" >=>  jsonResponse (channels absolutebase repository)
         GET >=> pathScan "/channel/%s/latest" (fun (ch) -> jsonResponseOpt (channellatest repository ch) )
         GET >=> pathScan "/channel/%s/version/%s" (fun (ch,v) -> jsonResponseOpt (channelversion repository ch v) )
-        GET >=> pathScan "/channel/%s" (fun ch -> jsonResponseOpt (channel absolutebase repository ch) )
-        GET >=> path "/tictactoe" >=> Files.file "index.html"
-        GET >=> path "/bundle.js" >=> Files.file "bundle.js" ]
+        GET >=> pathScan "/channel/%s" (fun ch -> jsonResponseOpt (channel absolutebase repository ch) ) ]
   startWebServer { defaultConfig with bindings = [ HttpBinding.createSimple Protocol.HTTP ipaddress port ] } app
   System.Console.ReadLine() |> ignore
   0
