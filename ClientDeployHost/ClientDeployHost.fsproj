@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp2.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../Shared/Common.fs" />
+    <Compile Include="../Shared/RepoResources.fs" />
+    <Compile Include="ClientDeployRepo.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+  <ItemGroup>
+    <DotNetCliToolReference Include="Microsoft.DotNet.Watcher.Tools" Version="2.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Fable.JsonConverter" Version="1.0.2" />
+    <PackageReference Include="newtonsoft.json" Version="10.0.3" />
+    <PackageReference Include="semver" Version="2.0.4" />
+    <PackageReference Include="suave" Version="2.2.1" />
+  </ItemGroup>
+</Project>
