@@ -87,6 +87,11 @@ let main argv =
   let path_to_repo = argv.[1]
   let repository = scan path_to_repo
 
+  let protocol = parts.[0]
+  let ipaddress = parts.[1].Trim([|'/'|])
+  let port = System.Int32.Parse (parts.[2])
+  if (protocol<>"http") then failwithf "Protocol %s not supported" protocol
+
 
   let app =
     choose
@@ -99,6 +104,6 @@ let main argv =
         GET >=> pathScan "/channel/%s" (fun ch -> jsonResponseOpt (channel absolutebase repository ch) )
         GET >=> path "/tictactoe" >=> Files.file "index.html"
         GET >=> path "/bundle.js" >=> Files.file "bundle.js" ]
-  startWebServer { defaultConfig with bindings = [ HttpBinding.createSimple Protocol.HTTP "127.0.0.1" 8081 ] } app
+  startWebServer { defaultConfig with bindings = [ HttpBinding.createSimple Protocol.HTTP ipaddress port ] } app
   System.Console.ReadLine() |> ignore
   0
