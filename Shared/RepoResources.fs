@@ -6,7 +6,8 @@ module Resources =
     { Version : string
       ReleaseNotes : string
       Hash : string
-      Deprecated : bool }
+      Deprecated : bool
+      Manifest : Manifests.VersionManifest }
 
   type VersionSummary =
     { Version : string

@@ -8,11 +8,14 @@ open Suave.WebSocket
 let converter = Fable.JsonConverter()
 
 open ClientDeploy
+open ClientDeploy.Manifests
 open ClientDeploy.RepoParser
 open ClientDeploy.Resources
 
 let private mkChannelUrl absolutebase ch = sprintf "%s/channel/%s" absolutebase ch
 let private mkVersionUrl absolutebase ch v = sprintf "%s/channel/%s/version/%s" absolutebase ch v
+let private mkResourceUrl absolutebase ch v res = sprintf "%s/channel/%s/version/%s/resources/%s" absolutebase ch v res
+let private mkGlobalResourceUrl absolutebase ch res = sprintf "%s/channel/%s/resources/%s" absolutebase ch res
 
 let private versionSummary absolutebase ch v =
   { VersionSummary.Version = v.Config.SemVer.ToString()
@@ -21,24 +24,38 @@ let private versionSummary absolutebase ch v =
     Hash = v.Hash
     Deprecated = v.Config.Deprecated }
 
-let private versionDetails ch v =
+let private versionDetails absolutebase ch (v:Version) =
+  let expectations =
+    v.Manifest.Expectations
+    |> List.map (function
+        | FileExpected (target,{ Resource.Source = path,source ; Hash = hash ; Size = size }) ->
+          if (path="~")
+            then FileExpected (target,{ Resource.Source = (mkResourceUrl absolutebase ch v.Config.Version source),"" ; Hash = hash ; Size = size })
+            else FileExpected (target,{ Resource.Source = (mkGlobalResourceUrl absolutebase ch path),source ; Hash = hash ; Size = size })
+        | ExactFileExpected (target,fhash,{ Resource.Source = path,source ; Hash = hash ; Size = size }) ->
+          if (path="~")
+            then ExactFileExpected (target,fhash,{ Resource.Source = (mkResourceUrl absolutebase ch v.Config.Version source),"" ; Hash = hash ; Size = size })
+            else ExactFileExpected (target,fhash,{ Resource.Source = (mkGlobalResourceUrl absolutebase ch path),source ; Hash = hash ; Size = size })
+        | x -> x)
+
   { VersionDetails.Version = v.Config.SemVer.ToString()
     ReleaseNotes = v.Config.ReleaseNotes
     Hash = v.Hash
-    Deprecated = v.Config.Deprecated }
+    Deprecated = v.Config.Deprecated
+    Manifest = { v.Manifest with Expectations = expectations } }
 
-let private channelversion repo ch v =
+let private channelversion absolutebase repo ch v =
   maybe {
     let! channel = repo.Channels |> Map.tryFind ch
     let! version = channel.Versions |> Map.tryFind v
-    return versionDetails ch version
+    return versionDetails absolutebase ch version
   }
 
-let private channellatest repo ch =
+let private channellatest absolutebase repo ch =
   maybe {
     let! channel = repo.Channels |> Map.tryFind ch
     let! latest = channel.Latest
-    return versionDetails ch latest
+    return versionDetails absolutebase ch latest
   }
 
 let channel absolutebase (repo:Repository) (ch:string) =
@@ -99,8 +116,8 @@ let main argv =
         GET >=> path "/repo" >=>  jsonResponse ({ RepositoryDescription.APIv1=(sprintf "%s/apiv1" absolutebase) ; CanonicalBaseUrl = absolutebase })
         GET >=> path "/apiv1" >=>  jsonResponse ({ RepositoryAPIv1.UpdaterUrl=null ; ChannelListUrl=(sprintf "%s/channels" absolutebase) })
         GET >=> path "/channels" >=>  jsonResponse (channels absolutebase repository)
-        GET >=> pathScan "/channel/%s/latest" (fun (ch) -> jsonResponseOpt (channellatest repository ch) )
-        GET >=> pathScan "/channel/%s/version/%s" (fun (ch,v) -> jsonResponseOpt (channelversion repository ch v) )
+        GET >=> pathScan "/channel/%s/latest" (fun (ch) -> jsonResponseOpt (channellatest absolutebase repository ch) )
+        GET >=> pathScan "/channel/%s/version/%s" (fun (ch,v) -> jsonResponseOpt (channelversion absolutebase repository ch v) )
         GET >=> pathScan "/channel/%s" (fun ch -> jsonResponseOpt (channel absolutebase repository ch) ) ]
   startWebServer { defaultConfig with bindings = [ HttpBinding.createSimple Protocol.HTTP ipaddress port ] } app
   System.Console.ReadLine() |> ignore

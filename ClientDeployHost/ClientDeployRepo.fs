@@ -30,8 +30,9 @@ module RepoParser =
 
   and Version =
     { Config : VersionConfig
-      RepoFiles : (string*string) list
-      Hash : string }
+      RepoFiles : (string*string*int) list
+      Hash : string
+      Manifest : Manifests.VersionManifest }
 
 
   let private converter = Fable.JsonConverter()
@@ -52,12 +53,12 @@ module RepoParser =
   let hashFile f =
     let data = System.IO.File.ReadAllBytes f
     let hash = hasher.ComputeHash data
-    System.Guid(hash).ToString()
+    System.Guid(hash).ToString(),data.Length
 
   let private scanFiles path =
     System.IO.Directory.GetFiles(path, "*.*")
     |> Seq.filter (fun f -> not (System.IO.Path.GetFileName(f).StartsWith(".")))
-    |> Seq.map (fun f -> f, (hashFile f))
+    |> Seq.map (fun f -> let (hash,size) = (hashFile f) in (hash,f,size))
     |> Seq.toList
 
   let private scanVersion path =
@@ -70,10 +71,21 @@ module RepoParser =
         let config = { config with SemVer = Semver.SemVersion.Parse(config.Version) }
         let config = { config with Version = config.SemVer.ToString() }
         let files = scanFiles path
+
+        let manifest =
+          [ Manifests.FolderExpected Manifests.INSTALLTARGET ] @
+          ( files |>
+            List.map (fun (hash,file,size) ->
+                let filename = System.IO.Path.Combine(Manifests.INSTALLTARGET,System.IO.Path.GetRelativePath(path,file))
+                let resource =
+                  { Manifests.Resource.Source="~",hash ; Manifests.Resource.Hash=hash ; Manifests.Resource.Size = size }
+                Manifests.FileExpected (filename,resource)))
+
         let version =
           { Version.Hash=""
             Config = config
-            RepoFiles = files }
+            RepoFiles = files
+            Manifest = { Manifests.VersionManifest.Expectations = manifest } }
         let json = Newtonsoft.Json.JsonConvert.SerializeObject(version,converter)
         let hash = hasher.ComputeHash(System.Text.Encoding.UTF8.GetBytes(json))
         let id = System.Guid(hash)
