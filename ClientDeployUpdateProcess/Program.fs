@@ -3,11 +3,13 @@
 module CommandLineApp =
 
   open Argu
+  open System
 
   type Arguments =
     | Check of string
     | Repository of string
     | Product of string
+    | Read of ReadArgument
   with
     interface IArgParserTemplate with
       member s.Usage =
@@ -15,6 +17,9 @@ module CommandLineApp =
         | Check _ -> "instruct ClientDeploy to check whether there is an update available"
         | Repository _ -> "specify a ClientDeploy repository base, either http://... or file:///..."
         | Product _ -> "specify product channel name"
+        | Read _ -> "read information on latest version"
+
+  and ReadArgument = | Version | Releasenotes
 
 
   [<EntryPoint>]
@@ -25,12 +30,20 @@ module CommandLineApp =
       try
         let arguments = parser.Parse argv
 
-        if arguments.Contains<@ Check @>
+        let repo = arguments.GetResult<@ Repository @>
+        let product = arguments.GetResult<@ Product @>
+
+        if arguments.Contains<@ Read @> 
+        then
+          let version = RepoClient.latest_version_information repo product
+          match arguments.GetResult<@ Read @> with
+          | Version -> printfn "%s" version.Version
+          | Releasenotes -> printfn "%s" version.ReleaseNotes
+          0
+
+        elif arguments.Contains<@ Check @>
         then
           let action = arguments.GetResult<@ Check @> |> Semver.SemVersion.Parse
-          let repo = arguments.GetResult<@ Repository @>
-          let product = arguments.GetResult<@ Product @>
-
           let version = RepoClient.latest_version repo product
 
           if (version = action) 

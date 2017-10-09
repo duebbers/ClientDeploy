@@ -183,12 +183,52 @@ namespace ClientDeploy
 
         public string AvailableVersion()
         {
-            return "";
+            if (!ready)
+            {
+                return "ClientDeploy Update System not functioning. This software will not receive updates!";
+            }
+
+            var args = $"--read version --repository {repo} --product {product}";
+
+            var psi = new ProcessStartInfo(_updaterExecutable, args)
+            {
+                ErrorDialog = false,
+                RedirectStandardOutput = true,
+                UseShellExecute = false
+            };
+            var process = Process.Start(psi);
+            if (process == null)
+            {
+                return "Update system unavailable at the moment...";
+            }
+
+            var info = process.StandardOutput.ReadToEnd();
+            return info;
         }
 
         public string AvailableVersionReleaseNotes()
         {
-            return "";
+            if (!ready)
+            {
+                return "ClientDeploy Update System not functioning. This software will not receive updates!";
+            }
+
+            var args = $"--read releasenotes --repository {repo} --product {product}";
+
+            var psi = new ProcessStartInfo(_updaterExecutable, args)
+            {
+                ErrorDialog = false,
+                RedirectStandardOutput = true,
+                UseShellExecute = false
+            };
+            var process = Process.Start(psi);
+            if (process == null)
+            {
+                return "Update system unavailable at the moment...";
+            }
+
+            var info = process.StandardOutput.ReadToEnd();
+            return info;
         }
 
         public void UpdateNow(Action<string> userInformation)

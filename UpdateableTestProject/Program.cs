@@ -20,9 +20,14 @@ namespace UpdateableTestProject
 
             _updater = ClientDeploy.Updater.Create(info => Console.WriteLine($"WARNING: {info}!"));
 
-            if (_updater.UpdatesAvailable()) UpdateAvailable();
-
-            Console.Out.WriteLine("No updates available right now... Checking again in 30 Seconds...");
+            if (_updater.UpdatesAvailable())
+            {
+                UpdateAvailable();
+            }
+            else
+            {
+                Console.Out.WriteLine("No updates available right now... Checking again in 30 Seconds...");
+            }
 
             _updater.SchedulePeriodicUpdateChecks(TimeSpan.FromSeconds(30), UpdateAvailable);
 

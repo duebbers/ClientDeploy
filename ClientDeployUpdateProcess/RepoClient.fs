@@ -43,6 +43,21 @@ module RepoClient =
     let updater = getUpdater wc api
     Semver.SemVersion.Parse(updater.UpdaterVersion,false)
 
+  let latest_version_information repo product = 
+    use wc = new System.Net.WebClient()
+    let repo = getRepoDescription wc repo
+    let api = getRepoAPIv1 wc repo
+    let channels = getChannelList wc api
+    match channels |> List.tryFind(fun ch -> ch.Channel = product) with
+    | Some channel ->
+      let info = getChannelInfo wc channel
+      match info.LatestVersionUrl with
+      | Some versionurl -> 
+        getVersionInfo wc versionurl
+      | None -> raise (TransientError (sprintf "no version available for channel %s" product))
+    | None ->
+      raise (TransientError (sprintf "unable to find channel %s" product))
+
   let latest_version repo product : Semver.SemVersion = 
     use wc = new System.Net.WebClient()
     let repo = getRepoDescription wc repo
