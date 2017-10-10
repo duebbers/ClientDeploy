@@ -123,6 +123,7 @@ let main argv =
   let app =
     choose
       [ GET >=> path "/" >=> OK "<h1>ClientDeploy Repository</h1><a href='/repo'>Repository Description</a>"
+        GET >=> path "/repo/clientdeploy.zip" >=> Files.sendFile (System.IO.Path.Combine(path_to_repo,"clientdeploy.zip")) false
         GET >=> path "/repo" >=>  jsonResponse ({ RepositoryDescription.APIv1=(sprintf "%s/apiv1" absolutebase) ; CanonicalBaseUrl = absolutebase })
         GET >=> path "/apiv1" >=>  jsonResponse ({ RepositoryAPIv1.UpdaterUrl=null ; ChannelListUrl=(sprintf "%s/channels" absolutebase) })
         GET >=> path "/channels" >=>  jsonResponse (channels absolutebase repository)

@@ -6,6 +6,7 @@ module Installer =
   open Manifests
   open System.Net
   open System.Diagnostics
+  open System.Threading
 
   type private InstallerAction =
     | KillProcess of int
@@ -106,7 +107,7 @@ module Installer =
     | DeleteFolderContent (path) -> printfn "Delete all files in folder '%s'" path
     | DeleteFolder (path) -> printfn "Remove folder '%s'" path
     | WriteConfig (file,kvlist) -> printfn "Write config to '%s'" file
-    | KillProcess pid -> printfn "Kill procedd with pid %d" pid
+    | KillProcess pid -> printfn "Kill process with pid %d" pid
     | StartProcess (exe,_) -> printfn "Start process '%s'" exe
 
   let private render =
@@ -158,6 +159,8 @@ module Installer =
     if simulate 
     then render steps
     else execute steps
+
+    Thread.Sleep(3000)
 
     0
       
