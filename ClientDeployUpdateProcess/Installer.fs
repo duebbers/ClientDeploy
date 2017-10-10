@@ -84,7 +84,7 @@ module Installer =
     let other =
         [ kill |> Option.map (fun pid -> 1,(InstallerAction.KillProcess pid))
           start |> Option.map (fun cmd -> 9,(InstallerAction.StartProcess cmd))
-          Some (8,(InstallerAction.WriteConfig(".clientdeploy.config",[ ("uuid",uuid) ; ("repo",repo) ; ("product",product) ; ("version",version) ])))] 
+          (if product<> "ClientDeployUpdateProcess" then Some (8,(InstallerAction.WriteConfig(".clientdeploy.config",[ ("uuid",uuid) ; ("repo",repo) ; ("product",product) ; ("version",version) ]))) else None) ] 
 
     let candidates = [ folders_to_create ; files_to_copy ] |> List.concat
     let errors = candidates |> List.filter (function | (_,Error _) -> true | _ -> false)

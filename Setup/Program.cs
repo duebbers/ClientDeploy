@@ -44,8 +44,10 @@ namespace Setup
             Console.Out.WriteLine("Removing temporary file");
             File.Delete(bootstrapper);
 
-            var cdup = File.ReadAllText(Path.Combine(cd, ".updater"));
-            var cdup2 = Path.Combine(".clientdeploy", cdup);
+            var updater = System.IO.Directory.GetDirectories(Path.Combine(cd, ".updater"))
+                .Select(_=>_.Split('\\').Last())
+                .OrderByDescending(Semver).FirstOrDefault() ?? "";
+            var cdup2 = Path.Combine(".clientdeploy", updater);
 
             Console.Out.WriteLine("Installing from "+cdup2);
             var psi = new ProcessStartInfo(
@@ -54,5 +56,11 @@ namespace Setup
 
             Process.Start(psi);
         }
+
+        private static string Semver(string v)
+        {
+            return String.Join(".", v.Split('.').Select(_ => _.PadLeft(10, '0')));
+        }
+
     }
 }

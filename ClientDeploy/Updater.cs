@@ -14,6 +14,11 @@ namespace ClientDeploy
         private Timer _timer;
         private string _updaterExecutable;
 
+        private string Semver(string v)
+        {
+            return String.Join(".", v.Split('.').Select(_ => _.PadLeft(10, '0')));
+        }
+
         private const string CONFIGFILENAME = ".clientdeploy.config";
 
         string uuid = null;
@@ -22,6 +27,7 @@ namespace ClientDeploy
         string product = null;
 
         private bool ready = false;
+        private string _updaterversion;
 
         public static Updater Create(Action<string> onWarning)
         {
@@ -81,19 +87,12 @@ namespace ClientDeploy
                 product = config["product"];
                 version = config["version"];
 
-                // LOCATE UPDATER PROCESS
-                // IF NOT FOUND, TRY TO DOWNLOAD
-
-                var updater = System.IO.Path.Combine(location, ".clientdeploy", ".updater");
-                if (!System.IO.File.Exists(updater))
-                {
-                    onWarning(
-                        $"Configuration file for ClientDeploy Update System not found at '{updater}'. This software will not receive automated updates!");
-                    return;
-                }
-
-                var u = System.IO.File.ReadAllText(updater);
-                _updaterExecutable = System.IO.Path.Combine(location, ".clientdeploy", u);
+                var updaterpath = System.IO.Path.Combine(location, ".clientdeploy", "updater");
+                _updaterversion = System.IO.Directory.GetDirectories(updaterpath)
+                                      .Select(_ => _.Split('\\').Last())
+                                      .OrderByDescending(Semver).FirstOrDefault() ?? "";
+                
+                _updaterExecutable = System.IO.Path.Combine(location, ".clientdeploy", "updater", _updaterversion, "ClientDeployUpdateProcess.exe");
                 if (!System.IO.File.Exists(_updaterExecutable))
                 {
                     onWarning(
@@ -102,12 +101,57 @@ namespace ClientDeploy
                 }
 
                 ready = true;
+                if (UpdaterUpdatesAvailable()) updateTheUpdater();
             }
             catch (Exception ex)
             {
                 onWarning($"Error while accessing update system. This software will not receive automated updates! [{ex.Message}//{ex.GetType().Name}]");
                 onWarning(ex.ToString());
             }
+        }
+
+        private void updateTheUpdater()
+        {
+            ready = false;
+
+            var args = $"--read version --repository {repo} --product ClientDeployUpdateProcess";
+
+            var psi = new ProcessStartInfo(_updaterExecutable, args)
+            {
+                ErrorDialog = false,
+                RedirectStandardOutput = true,
+                UseShellExecute = false
+            };
+            var process = Process.Start(psi);
+            if (process == null)
+            {
+                return;
+            }
+
+            var newversion = process.StandardOutput.ReadToEnd().Trim();
+
+            var uargs = $"--install .clientdeploy\\updater\\{newversion} --repository {repo} --product ClientDeployUpdateProcess";
+            var upsi = new ProcessStartInfo(_updaterExecutable, uargs);
+            var uprocess = Process.Start(upsi);
+            if (uprocess == null) return;
+
+            uprocess.WaitForExit(45000);
+
+
+            var location = System.IO.Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
+            Console.Out.WriteLine(location);
+            Console.Out.WriteLine(newversion);
+            var updaterExecutable = location + "\\.clientdeploy\\updater\\" + newversion + "\\ClientDeployUpdateProcess.exe";
+            Console.Out.WriteLine(updaterExecutable);
+            if (System.IO.File.Exists(updaterExecutable))
+            {
+                var oldversion = _updaterversion;
+                _updaterversion = newversion;
+                _updaterExecutable = updaterExecutable;
+                System.IO.Directory.Delete(location + "\\.clientdeploy\\updater\\" + oldversion, true);
+            }
+
+            ready = true;
         }
 
         public void SchedulePeriodicUpdateChecks(TimeSpan periodicCheckForUpdates, Action onUpdatesAvailable)
@@ -122,6 +166,7 @@ namespace ClientDeploy
             {
                 try
                 {
+                    if (UpdaterUpdatesAvailable()) updateTheUpdater();
                     if (UpdatesAvailable()) onUpdatesAvailable();
                 }
                 catch (Exception ex)
@@ -158,6 +203,50 @@ namespace ClientDeploy
                 return false;
             }
 
+            var info = process.StandardOutput.ReadToEnd();
+            if (info.StartsWith("#ERROR"))
+            {
+                if (info.Contains("TransientError"))
+                {
+                    _onWarning($"Unable to access Updates at the moment... ({info})");
+                    return false;
+                }
+                else
+                {
+                    _onWarning($"Error in ClientDeploy Update System. This software will not receive automated updates! ({info})");
+                    return false;
+                }
+            }
+
+            if (info.StartsWith("#LATEST")) return false;
+
+            if (info.StartsWith("#UPDATE")) return true;
+
+            _onWarning($"Unexpected response from ClientDeploy Update System: {info}");
+            return false;
+        }
+
+        public bool UpdaterUpdatesAvailable()
+        {
+            if (!ready)
+            {
+                return false;
+            }
+            var args = $"--check {_updaterversion} --repository {repo} --product ClientDeployUpdateProcess";
+
+            var psi = new ProcessStartInfo(_updaterExecutable, args)
+            {
+                ErrorDialog = false,
+                RedirectStandardOutput = true,
+                UseShellExecute = false
+            };
+            var process = Process.Start(psi);
+            if (process == null)
+            {
+                _onWarning(
+                    $"Unable to start ClientDeploy Update System at '{_updaterExecutable}'. This software will not receive automated updates!");
+                return false;
+            }
             var info = process.StandardOutput.ReadToEnd();
             if (info.StartsWith("#ERROR"))
             {

@@ -92,13 +92,17 @@ module CommandLineApp =
       with
       | :? ArguParseException as ex ->
         printfn "#ERROR\r\n\r\n%s" ex.Message
+        System.Threading.Thread.Sleep(3000)
         2
       | :? RepoClient.TransientError as ex ->
         printfn "#ERROR\r\n\r\n%A" ex
+        System.Threading.Thread.Sleep(3000)
         2
       | :? RepoClient.IncompatibleRepository as ex ->
         printfn "#ERROR\r\n\r\n%A" ex
+        System.Threading.Thread.Sleep(3000)
         2
       | ex ->
-        printfn "#ERROR\r\n\r\n%s" ex.Message
+        printfn "#ERROR\r\n\r\n%s '%s' %s" ex.Message (System.Environment.CommandLine) (ex.ToString())
+        System.Threading.Thread.Sleep(3000)
         2
