@@ -2,15 +2,13 @@
 using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
-using System.Threading;
+using System.Timers;
 
 namespace ClientDeploy
 {
     public class Updater
     {
         private readonly Action<string> _onWarning;
-        private readonly Action<string> _onUpdateAvailable;
-        private readonly TimeSpan? _periodicCheckForUpdates;
         private Timer _timer;
         private string _updaterExecutable;
 
@@ -38,15 +36,19 @@ namespace ClientDeploy
 
         private Updater(Action<string> onWarning)
         {
+            _onWarning = onWarning;
+            Connect();
+        }
+
+        private void Connect()
+        {
             try
             {
-                _onWarning = onWarning;
-
                 var location = System.IO.Path.GetDirectoryName(Assembly.GetEntryAssembly().Location);
                 var configfile = System.IO.Path.Combine(location, CONFIGFILENAME);
                 if (!System.IO.File.Exists(configfile))
                 {
-                    onWarning(
+                    _onWarning(
                         $"Configuration file for ClientDeploy Installation not found at '{configfile}'. This software will not receive automated updates!");
                     return;
                 }
@@ -55,29 +57,29 @@ namespace ClientDeploy
                     System.IO.File.ReadAllLines(configfile)
                         .Select(_ => _.Trim())
                         .Where(_ => !_.StartsWith("#"))
-                        .Select(_ => _.Split(new[] {'|'}, 2)).ToDictionary(kv => kv[0], kv => kv[1]);
+                        .Select(_ => _.Split(new[] { '|' }, 2)).ToDictionary(kv => kv[0], kv => kv[1]);
 
                 if (!config.ContainsKey("uuid"))
                 {
-                    onWarning(
+                    _onWarning(
                         $"Configuration file for ClientDeploy Installation has no uuid. This software will not receive automated updates!");
                     return;
                 }
                 if (!config.ContainsKey("repo"))
                 {
-                    onWarning(
+                    _onWarning(
                         $"Configuration file for ClientDeploy Installation has no uuid. This software will not receive automated updates!");
                     return;
                 }
                 if (!config.ContainsKey("product"))
                 {
-                    onWarning(
+                    _onWarning(
                         $"Configuration file for ClientDeploy Installation has no product information. This software will not receive automated updates!");
                     return;
                 }
                 if (!config.ContainsKey("version"))
                 {
-                    onWarning(
+                    _onWarning(
                         $"Configuration file for ClientDeploy Installation has no version information. This software will not receive automated updates!");
                     return;
                 }
@@ -91,11 +93,11 @@ namespace ClientDeploy
                 _updaterversion = System.IO.Directory.GetDirectories(updaterpath)
                                       .Select(_ => _.Split('\\').Last())
                                       .OrderByDescending(Semver).FirstOrDefault() ?? "";
-                
+
                 _updaterExecutable = System.IO.Path.Combine(location, ".clientdeploy", "updater", _updaterversion, "ClientDeployUpdateProcess.exe");
                 if (!System.IO.File.Exists(_updaterExecutable))
                 {
-                    onWarning(
+                    _onWarning(
                         $"Executable for ClientDeploy Update System not found at '{_updaterExecutable}'. This software will not receive automated updates!");
                     return;
                 }
@@ -105,8 +107,8 @@ namespace ClientDeploy
             }
             catch (Exception ex)
             {
-                onWarning($"Error while accessing update system. This software will not receive automated updates! [{ex.Message}//{ex.GetType().Name}]");
-                onWarning(ex.ToString());
+                _onWarning($"Error while accessing update system. This software will not receive automated updates! [{ex.Message}//{ex.GetType().Name}]");
+                _onWarning(ex.ToString());
             }
         }
 
@@ -162,21 +164,27 @@ namespace ClientDeploy
                 return;
             }
 
-            _timer = new System.Threading.Timer(_ =>
+            _timer = new System.Timers.Timer();
+            _timer.Elapsed += ((s, a) =>
             {
                 try
                 {
+                    if (!ready) Connect();
+                    if (!ready) return;
                     if (UpdaterUpdatesAvailable()) updateTheUpdater();
                     if (UpdatesAvailable()) onUpdatesAvailable();
                 }
                 catch (Exception ex)
                 {
-                    _onWarning($"Error while accessing update system. This software will not receive automated updates! [{ex.Message}//{ex.GetType().Name}]");
+                    _onWarning(
+                        $"Error while accessing update system. This software will not receive automated updates! [{ex.Message}//{ex.GetType().Name}]");
                     _onWarning(ex.ToString());
-                    _timer.Dispose();
-                    _timer = null;
+                    ready = false;
                 }
-            }, null, periodicCheckForUpdates, periodicCheckForUpdates);
+            });
+            _timer.AutoReset = true;
+            _timer.Interval = periodicCheckForUpdates.TotalMilliseconds;
+            _timer.Start();
         }
 
         public bool UpdatesAvailable()

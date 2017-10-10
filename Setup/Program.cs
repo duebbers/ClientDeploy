@@ -44,10 +44,10 @@ namespace Setup
             Console.Out.WriteLine("Removing temporary file");
             File.Delete(bootstrapper);
 
-            var updater = System.IO.Directory.GetDirectories(Path.Combine(cd, ".updater"))
+            var updater = System.IO.Directory.GetDirectories(Path.Combine(cd, "updater"))
                 .Select(_=>_.Split('\\').Last())
                 .OrderByDescending(Semver).FirstOrDefault() ?? "";
-            var cdup2 = Path.Combine(".clientdeploy", updater);
+            var cdup2 = Path.Combine(".clientdeploy","updater", updater, "ClientDeployUpdateProcess.exe");
 
             Console.Out.WriteLine("Installing from "+cdup2);
             var psi = new ProcessStartInfo(

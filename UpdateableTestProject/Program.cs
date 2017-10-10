@@ -33,8 +33,9 @@ namespace UpdateableTestProject
             _updater.SchedulePeriodicUpdateChecks(TimeSpan.FromSeconds(30), UpdateAvailable);
 
             Console.Out.WriteLine("Press enter to exit...");
-            _updater.Dispose();
             Console.ReadLine();
+            _updater.Dispose();
+
         }
 
         private static void UpdateAvailable()
