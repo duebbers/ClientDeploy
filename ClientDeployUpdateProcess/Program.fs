@@ -15,6 +15,7 @@ module CommandLineApp =
     | Version of string
     | Kill of int
     | Start of string
+    | Args of string
     | UUID of string
   with
     interface IArgParserTemplate with
@@ -29,6 +30,7 @@ module CommandLineApp =
         | Version _ -> "version for installation"
         | Kill _ -> "kill process with pid"
         | Start _ -> "start process after installation"
+        | Args _ -> "Arguments for start process after installation"
         | UUID _ -> "relate installation"
 
   and ReadArgument = | Version | Releasenotes
@@ -53,7 +55,12 @@ module CommandLineApp =
             then Some (Semver.SemVersion.Parse (arguments.GetResult<@ Arguments.Version @>))
             else None
           let kill = if arguments.Contains<@ Kill @> then (Some (arguments.GetResult<@ Kill @>)) else None 
-          let start = if arguments.Contains<@ Start @> then (Some (arguments.GetResult<@ Start @>)) else None 
+          let start = 
+            if arguments.Contains<@ Start @> 
+            then 
+              let cargs = if arguments.Contains<@ Args @> then arguments.GetResult<@ Args @> else ""
+              (Some ((arguments.GetResult<@ Start @>),cargs)) 
+            else None 
           let uuid = if arguments.Contains<@ UUID @> then ((arguments.GetResult<@ UUID @>)) else System.Guid.NewGuid().ToString()
           Installer.run repo product version targetfolder (arguments.Contains<@ Simulate @>) kill start uuid
 

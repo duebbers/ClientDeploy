@@ -19,7 +19,7 @@ module Installer =
     | DeleteFolder of string
     | WriteConfig of string*((string*string) list)
     | Error of string
-    | StartProcess of (string)
+    | StartProcess of (string*string)
 
 
   let hasher = System.Security.Cryptography.MD5.Create()
@@ -30,7 +30,7 @@ module Installer =
     System.Guid(hash).ToString()
 
 
-  let private check_expectations target expectations (kill:int option) (start:string option) uuid repo product version : (int*InstallerAction) list = 
+  let private check_expectations target expectations (kill:int option) (start:(string*string) option) uuid repo product version : (int*InstallerAction) list = 
 
     let replace (p:string) : string = p.Replace(Manifests.INSTALLTARGET,target)
 
@@ -107,7 +107,7 @@ module Installer =
     | DeleteFolder (path) -> printfn "Remove folder '%s'" path
     | WriteConfig (file,kvlist) -> printfn "Write config to '%s'" file
     | KillProcess pid -> printfn "Kill procedd with pid %d" pid
-    | StartProcess (exe) -> printfn "Start process '%s'" exe
+    | StartProcess (exe,_) -> printfn "Start process '%s'" exe
 
   let private render =
     function
@@ -126,11 +126,9 @@ module Installer =
           p.Kill()
           if (not (p.WaitForExit(5000))) then failwithf "Unable to terminate process with pid %d" pid
         else ()
-    | StartProcess (exe) ->
-      (*let psi = new ProcessStartInfo(exe,args)
-      psi.WorkingDirectory <- cwd
-      Process.Start(psi) |> ignore*)
-      Process.Start(exe) |> ignore
+    | StartProcess (exe,args) ->
+      let psi = new ProcessStartInfo(exe,args)
+      Process.Start(psi) |> ignore
     | CreateFolder p -> System.IO.Directory.CreateDirectory(p) |> ignore
     | DownloadResource (hash,size,source,file) -> wc.DownloadFile(source,hash)
     | CreateFileFromResource (file,(source),size,hash) -> File.Copy(hash,file,true)

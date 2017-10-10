@@ -9,7 +9,7 @@ namespace UpdateableTestProject
 
         static void Main(string[] args)
         {
-            Console.Out.WriteLine("Updateable Test Project starting...");
+            Console.Out.WriteLine("Updateable Test Project starting: " + (String.Join(" ",args)));
 
             var addendum =
                 System.IO.File.Exists("myversion.txt")

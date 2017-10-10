@@ -239,10 +239,10 @@ namespace ClientDeploy
             }
 
             var pid = System.Diagnostics.Process.GetCurrentProcess().Id;
+            var entry = Assembly.GetEntryAssembly().Location;
+            var cargs = String.Join(" ", System.Environment.GetCommandLineArgs());
 
-            var cmdline = System.Environment.CommandLine;
-
-            var args = $"--install . --repository {repo} --product {product} --kill {pid} --start {cmdline}";
+            var args = $"--install . --repository {repo} --product {product} --kill {pid} --start \"{entry}\" --args \"{cargs}\"";
 
             var psi = new ProcessStartInfo(_updaterExecutable, args);
 
