@@ -16,7 +16,7 @@ namespace UpdateableTestProject
                     ? $", with config file of {System.IO.File.ReadAllText("myversion.txt")}"
                     : "";
 
-            Console.Out.WriteLine($"This is Version 1{addendum}.");
+            Console.Out.WriteLine($"This is Version 2{addendum}.");
 
             _updater = ClientDeploy.Updater.Create(info => Console.WriteLine($"WARNING: {info}!"));
 

@@ -233,7 +233,27 @@ namespace ClientDeploy
 
         public void UpdateNow(Action<string> userInformation)
         {
-            userInformation("Updates not implemented.");
+            if (!ready)
+            {
+                return;
+            }
+
+            var pid = System.Diagnostics.Process.GetCurrentProcess().Id;
+
+            var cmdline = System.Environment.CommandLine;
+
+            var args = $"--install . --repository {repo} --product {product} --kill {pid} --start {cmdline}";
+
+            var psi = new ProcessStartInfo(_updaterExecutable, args);
+
+            userInformation("Beginning update...");
+
+            var process = Process.Start(psi);
+            if (process == null)
+            {
+                return;
+            }
+
         }
 
         public void Dispose()

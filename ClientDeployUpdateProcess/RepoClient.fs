@@ -32,7 +32,7 @@ module RepoClient =
   let private getChannelInfo (wc:System.Net.WebClient) (channel:Resources.ChannelSummary) : Resources.ChannelDetails =    
     downloadAndDeserialize<Resources.ChannelDetails> wc channel.ChannelDetailsUrl (sprintf "channel details for %s" channel.Channel)
 
-  let private getVersionInfo (wc:System.Net.WebClient) (url:string) : Resources.VersionDetails =    
+  let private getVersionDetails (wc:System.Net.WebClient) (url:string) : Resources.VersionDetails =    
     downloadAndDeserialize<Resources.VersionDetails> wc url (sprintf "version details for")
 
 
@@ -42,6 +42,21 @@ module RepoClient =
     let api = getRepoAPIv1 wc repo
     let updater = getUpdater wc api
     Semver.SemVersion.Parse(updater.UpdaterVersion,false)
+
+  let version_details (repo:string) product version = 
+    use wc = new System.Net.WebClient()
+    let repo = getRepoDescription wc repo
+    let api = getRepoAPIv1 wc repo
+    let channels = getChannelList wc api
+    match channels |> List.tryFind(fun ch -> ch.Channel = product) with
+    | Some channel ->
+      let info = getChannelInfo wc channel
+      match info.Versions |> List.tryFind (fun vv -> (Semver.SemVersion.Parse vv.Version) = version) with
+      | Some versioninfo -> 
+        getVersionDetails wc versioninfo.VersionDetailsUrl
+      | None -> raise (TransientError (sprintf "no version available for channel %s" product))
+    | None ->
+      raise (TransientError (sprintf "unable to find channel %s" product))
 
   let latest_version_information repo product = 
     use wc = new System.Net.WebClient()
@@ -53,7 +68,7 @@ module RepoClient =
       let info = getChannelInfo wc channel
       match info.LatestVersionUrl with
       | Some versionurl -> 
-        getVersionInfo wc versionurl
+        getVersionDetails wc versionurl
       | None -> raise (TransientError (sprintf "no version available for channel %s" product))
     | None ->
       raise (TransientError (sprintf "unable to find channel %s" product))
@@ -68,7 +83,7 @@ module RepoClient =
       let info = getChannelInfo wc channel
       match info.LatestVersionUrl with
       | Some versionurl -> 
-        let version = getVersionInfo wc versionurl
+        let version = getVersionDetails wc versionurl
         Semver.SemVersion.Parse(version.Version,false)
       | None -> raise (TransientError (sprintf "no version available for channel %s" product))
     | None ->

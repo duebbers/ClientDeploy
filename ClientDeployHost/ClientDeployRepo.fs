@@ -79,7 +79,7 @@ module RepoParser =
                 let filename = System.IO.Path.Combine(Manifests.INSTALLTARGET,System.IO.Path.GetRelativePath(path,file))
                 let resource =
                   { Manifests.Resource.Source="~",hash ; Manifests.Resource.Hash=hash ; Manifests.Resource.Size = size }
-                Manifests.FileExpected (filename,resource)))
+                Manifests.ExactFileExpected (filename,hash,resource)))
 
         let version =
           { Version.Hash=""

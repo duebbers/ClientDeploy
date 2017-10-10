@@ -60,10 +60,14 @@
     <Compile Include="..\Shared\common.fs">
       <Link>common.fs</Link>
     </Compile>
+    <Compile Include="..\Shared\VersionManifest.fs">
+      <Link>VersionManifest.fs</Link>
+    </Compile>
     <Compile Include="..\Shared\RepoResources.fs">
       <Link>RepoResources.fs</Link>
     </Compile>
     <Compile Include="RepoClient.fs" />
+    <Compile Include="Installer.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>

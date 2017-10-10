@@ -14,8 +14,8 @@ open ClientDeploy.Resources
 
 let private mkChannelUrl absolutebase ch = sprintf "%s/channel/%s" absolutebase ch
 let private mkVersionUrl absolutebase ch v = sprintf "%s/channel/%s/version/%s" absolutebase ch v
-let private mkResourceUrl absolutebase ch v res = sprintf "%s/channel/%s/version/%s/resources/%s" absolutebase ch v res
-let private mkGlobalResourceUrl absolutebase ch res = sprintf "%s/channel/%s/resources/%s" absolutebase ch res
+let private mkResourceUrl absolutebase ch v (res:string) = sprintf "%s/channel/%s/version/%s/resource/%s.dat" absolutebase ch v (res.Replace("-",""))
+let private mkGlobalResourceUrl absolutebase ch res = sprintf "%s/channel/%s/resourcepack/%s" absolutebase ch res
 
 let private versionSummary absolutebase ch v =
   { VersionSummary.Version = v.Config.SemVer.ToString()
@@ -43,6 +43,16 @@ let private versionDetails absolutebase ch (v:Version) =
     Hash = v.Hash
     Deprecated = v.Config.Deprecated
     Manifest = { v.Manifest with Expectations = expectations } }
+
+let private lookup repo ch v res =
+  let (a,b,c) =
+    ( maybe {
+        let! channel = repo.Channels |> Map.tryFind ch
+        let! version = channel.Versions |> Map.tryFind v
+        let r = (version.RepoFiles |> List.find (fun (a,b,c)->a.Replace("-","")=res))
+        return r
+      }).Value
+  b
 
 let private channelversion absolutebase repo ch v =
   maybe {
@@ -88,10 +98,10 @@ let channels absolutebase (repo:Repository) =
 
 let jsonContent = Writers.setHeader "Content-Type" "application/json;charset=utf-8"
 let jsonResponse data = jsonContent >=> OK (Newtonsoft.Json.JsonConvert.SerializeObject(data,converter))
-let jsonResponseOpt =
+let jsonResponseOpt info =
   function
   | Some data -> jsonContent >=> OK (Newtonsoft.Json.JsonConvert.SerializeObject(data,converter))
-  | None -> RequestErrors.NOT_FOUND "Sorry, the requested resource was not found."
+  | None -> RequestErrors.NOT_FOUND (sprintf "Sorry, the requested resource was not found (%s)." info)
 
 
 [<EntryPoint>]
@@ -116,9 +126,10 @@ let main argv =
         GET >=> path "/repo" >=>  jsonResponse ({ RepositoryDescription.APIv1=(sprintf "%s/apiv1" absolutebase) ; CanonicalBaseUrl = absolutebase })
         GET >=> path "/apiv1" >=>  jsonResponse ({ RepositoryAPIv1.UpdaterUrl=null ; ChannelListUrl=(sprintf "%s/channels" absolutebase) })
         GET >=> path "/channels" >=>  jsonResponse (channels absolutebase repository)
-        GET >=> pathScan "/channel/%s/latest" (fun (ch) -> jsonResponseOpt (channellatest absolutebase repository ch) )
-        GET >=> pathScan "/channel/%s/version/%s" (fun (ch,v) -> jsonResponseOpt (channelversion absolutebase repository ch v) )
-        GET >=> pathScan "/channel/%s" (fun ch -> jsonResponseOpt (channel absolutebase repository ch) ) ]
+        GET >=> pathScan "/channel/%s/latest" (fun (ch) -> jsonResponseOpt "A" (channellatest absolutebase repository ch) )
+        GET >=> pathScan "/channel/%s/version/%s/resource/%s.dat" (fun (ch,v,res) -> Files.sendFile (lookup repository ch v res) true )
+        GET >=> pathScan "/channel/%s/version/%s" (fun (ch,v) -> jsonResponseOpt "B" (channelversion absolutebase repository ch v) )
+        GET >=> pathScan "/channel/%s" (fun ch -> jsonResponseOpt "C" (channel absolutebase repository ch) ) ]
   startWebServer { defaultConfig with bindings = [ HttpBinding.createSimple Protocol.HTTP ipaddress port ] } app
   System.Console.ReadLine() |> ignore
   0
