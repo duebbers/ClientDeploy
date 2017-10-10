@@ -28,6 +28,12 @@ A set of tools for providing software installation and update facilities for use
  * In the background, the Updater always provides for the newest CDUP version.
 
 
+### Standalone installer (setup.exe)
+
+ * Requires .net 4.5
+ * call with three arguments: repo product targetfolder
+ * setup will download the current ClientDeployUPdateProcess and instruct that to install the requested product
+
 ## Roadmap
 
  * Log install/update steps to local file
