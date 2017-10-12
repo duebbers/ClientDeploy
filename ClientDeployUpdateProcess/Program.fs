@@ -37,30 +37,30 @@ module CommandLineApp =
 
 
   [<EntryPoint>]
-  let main argv = 
+  let main argv =
 
       let parser = ArgumentParser.Create<Arguments>(programName = "ClientDeployUpdateProcess.exe")
- 
+
       try
         let arguments = parser.Parse argv
 
         let repo = arguments.GetResult<@ Repository @>
         let product = arguments.GetResult<@ Product @>
 
-        if arguments.Contains<@ Install @> 
-        then 
+        if arguments.Contains<@ Install @>
+        then
           let targetfolder = arguments.GetResult<@ Install @>
-          let version : (Semver.SemVersion) option = 
+          let version : (Semver.SemVersion) option =
             if arguments.Contains<@ Arguments.Version @> 
             then Some (Semver.SemVersion.Parse (arguments.GetResult<@ Arguments.Version @>))
             else None
-          let kill = if arguments.Contains<@ Kill @> then (Some (arguments.GetResult<@ Kill @>)) else None 
-          let start = 
-            if arguments.Contains<@ Start @> 
-            then 
+          let kill = if arguments.Contains<@ Kill @> then (Some (arguments.GetResult<@ Kill @>)) else None
+          let start =
+            if arguments.Contains<@ Start @>
+            then
               let cargs = if arguments.Contains<@ Args @> then arguments.GetResult<@ Args @> else ""
-              (Some ((arguments.GetResult<@ Start @>),cargs)) 
-            else None 
+              (Some ((arguments.GetResult<@ Start @>),cargs))
+            else None
           let uuid = if arguments.Contains<@ UUID @> then ((arguments.GetResult<@ UUID @>)) else System.Guid.NewGuid().ToString()
           Installer.run repo product version targetfolder (arguments.Contains<@ Simulate @>) kill start uuid
 
@@ -75,15 +75,15 @@ module CommandLineApp =
 
         elif arguments.Contains<@ Check @>
         then
-          let action = arguments.GetResult<@ Check @> |> Semver.SemVersion.Parse
-          let version = RepoClient.latest_version repo product
+          let currentVersion = arguments.GetResult<@ Check @> |> Semver.SemVersion.Parse
+          let latestVersion = RepoClient.latest_version repo product
 
-          if (version = action) 
+          if (latestVersion = currentVersion) 
             then 
               printfn "#LATEST"
               0
             else 
-              printfn "#UPDATE\r\n%s" (version.ToString())
+              printfn "#UPDATE\r\n%s" (latestVersion.ToString())
               1
         else          
           printfn "#USAGE"
@@ -91,18 +91,18 @@ module CommandLineApp =
           2
       with
       | :? ArguParseException as ex ->
-        printfn "#ERROR\r\n\r\n%s" ex.Message
+        printfn "#ERRORFATAL\r\n\r\n%s" ex.Message
         System.Threading.Thread.Sleep(3000)
         2
       | :? RepoClient.TransientError as ex ->
-        printfn "#ERROR\r\n\r\n%A" ex
+        printfn "#ERRORTRANSIENT\r\n\r\n%A" ex
         System.Threading.Thread.Sleep(3000)
         2
       | :? RepoClient.IncompatibleRepository as ex ->
-        printfn "#ERROR\r\n\r\n%A" ex
+        printfn "#ERRORFATAL\r\n\r\n%A" ex
         System.Threading.Thread.Sleep(3000)
         2
       | ex ->
-        printfn "#ERROR\r\n\r\n%s '%s' %s" ex.Message (System.Environment.CommandLine) (ex.ToString())
+        printfn "#ERRORFATAL\r\n\r\n%s '%s' %s" ex.Message (System.Environment.CommandLine) (ex.ToString())
         System.Threading.Thread.Sleep(3000)
         2

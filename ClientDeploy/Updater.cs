@@ -214,7 +214,7 @@ namespace ClientDeploy
             var info = process.StandardOutput.ReadToEnd();
             if (info.StartsWith("#ERROR"))
             {
-                if (info.Contains("TransientError"))
+                if (info.StartsWith("#ERRORTRANSIENT"))
                 {
                     _onWarning($"Unable to access Updates at the moment... ({info})");
                     return false;
@@ -258,7 +258,7 @@ namespace ClientDeploy
             var info = process.StandardOutput.ReadToEnd();
             if (info.StartsWith("#ERROR"))
             {
-                if (info.Contains("TransientError"))
+                if (info.StartsWith("#ERRORTRANSIENT"))
                 {
                     _onWarning($"Unable to access Updates at the moment... ({info})");
                     return false;

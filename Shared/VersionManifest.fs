@@ -2,7 +2,9 @@ namespace ClientDeploy
 
 module Manifests =
 
-  let INSTALLTARGET = "%installtarget%"
+  module PathPlaceholders =
+    let INSTALLTARGET = "%installtarget%"
+
 
   type Hash = string
 

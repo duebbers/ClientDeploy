@@ -18,38 +18,39 @@ let private mkResourceUrl absolutebase ch v (res:string) = sprintf "%s/channel/%
 let private mkGlobalResourceUrl absolutebase ch res = sprintf "%s/channel/%s/resourcepack/%s" absolutebase ch res
 
 let private versionSummary absolutebase ch v =
-  { VersionSummary.Version = v.Config.SemVer.ToString()
-    VersionDetailsUrl = mkVersionUrl absolutebase ch v.Config.Version
-    ReleaseNotes = v.Config.ReleaseNotes
+  { VersionSummary.Version = v.Configuration.SemVer.ToString()
+    VersionDetailsUrl = mkVersionUrl absolutebase ch v.Configuration.Version
+    ReleaseNotes = v.Configuration.ReleaseNotes
     Hash = v.Hash
-    Deprecated = v.Config.Deprecated }
+    Deprecated = v.Configuration.Deprecated }
 
 let private versionDetails absolutebase ch (v:Version) =
-  let expectations =
+  let mapPathToUrl (path,source) =
+    if path="~"
+    then (mkResourceUrl absolutebase ch v.Configuration.Version source),""
+    else (mkGlobalResourceUrl absolutebase ch path),source
+
+  let rewriteExpectations =
     v.Manifest.Expectations
     |> List.map (function
-        | FileExpected (target,{ Resource.Source = path,source ; Hash = hash ; Size = size }) ->
-          if (path="~")
-            then FileExpected (target,{ Resource.Source = (mkResourceUrl absolutebase ch v.Config.Version source),"" ; Hash = hash ; Size = size })
-            else FileExpected (target,{ Resource.Source = (mkGlobalResourceUrl absolutebase ch path),source ; Hash = hash ; Size = size })
-        | ExactFileExpected (target,fhash,{ Resource.Source = path,source ; Hash = hash ; Size = size }) ->
-          if (path="~")
-            then ExactFileExpected (target,fhash,{ Resource.Source = (mkResourceUrl absolutebase ch v.Config.Version source),"" ; Hash = hash ; Size = size })
-            else ExactFileExpected (target,fhash,{ Resource.Source = (mkGlobalResourceUrl absolutebase ch path),source ; Hash = hash ; Size = size })
+        | FileExpected (target, resource) ->
+          FileExpected (target, { resource with Source = mapPathToUrl resource.Source })
+        | ExactFileExpected (target,fhash, resource) ->
+          ExactFileExpected (target,fhash,{ resource with Source = mapPathToUrl resource.Source })
         | x -> x)
 
-  { VersionDetails.Version = v.Config.SemVer.ToString()
-    ReleaseNotes = v.Config.ReleaseNotes
+  { VersionDetails.Version = v.Configuration.SemVer.ToString()
+    ReleaseNotes = v.Configuration.ReleaseNotes
     Hash = v.Hash
-    Deprecated = v.Config.Deprecated
-    Manifest = { v.Manifest with Expectations = expectations } }
+    Deprecated = v.Configuration.Deprecated
+    Manifest = { v.Manifest with Expectations = rewriteExpectations } }
 
 let private lookup repo ch v res =
   let (a,b,c) =
     ( maybe {
         let! channel = repo.Channels |> Map.tryFind ch
         let! version = channel.Versions |> Map.tryFind v
-        let r = (version.RepoFiles |> List.find (fun (a,b,c)->a.Replace("-","")=res))
+        let r = (version.FilesInRepository |> List.find (fun (a,b,c)->a.Replace("-","")=res))
         return r
       }).Value
   b
@@ -64,34 +65,34 @@ let private channelversion absolutebase repo ch v =
 let private channellatest absolutebase repo ch =
   maybe {
     let! channel = repo.Channels |> Map.tryFind ch
-    let! latest = channel.Latest
+    let! latest = channel.LatestVersion
     return versionDetails absolutebase ch latest
   }
 
-let channel absolutebase (repo:Repository) (ch:string) =
+let channel absolutebase (repo:CachedRepository) (ch:string) =
   repo.Channels
   |> Map.tryFind ch
   |> Option.map (fun ch ->
       let versions =
         ch.Versions
         |> Map.toSeq
-        |> Seq.sortByDescending (fun (_,v) -> v.Config.SemVer)
+        |> Seq.sortByDescending (fun (_,v) -> v.Configuration.SemVer)
         |> Seq.map (snd>>(versionSummary absolutebase ch.Name))
         |> Seq.toList
       { ChannelDetails.Channel = ch.Name
-        DisplayName = ch.Config.Displayname
-        Description = ch.Config.Description
-        LatestVersionUrl = ch.Latest |> Option.map (fun _ -> sprintf "%s/%s" (mkChannelUrl absolutebase ch.Name) "latest")
+        DisplayName = ch.Configuration.Displayname
+        Description = ch.Configuration.Description
+        LatestVersionUrl = ch.LatestVersion |> Option.map (fun _ -> sprintf "%s/%s" (mkChannelUrl absolutebase ch.Name) "latest")
         Versions = versions } )
 
-let channels absolutebase (repo:Repository) =
+let channels absolutebase (repo:CachedRepository) =
   repo.Channels
   |> Map.toSeq
   |> Seq.map (fun (_,ch) ->
       { ChannelSummary.Channel = ch.Name
-        DisplayName = ch.Config.Displayname
+        DisplayName = ch.Configuration.Displayname
         ChannelDetailsUrl = mkChannelUrl absolutebase ch.Name
-        Description = ch.Config.Description })
+        Description = ch.Configuration.Description })
   |> Seq.sortBy (fun l -> l.Channel)
   |> Seq.toList
 
@@ -111,8 +112,8 @@ let main argv =
 
   let absolutebase = argv.[0]
   let parts = absolutebase.Split(":")
-  let path_to_repo = argv.[1]
-  let repository = scan path_to_repo
+  let pathToRepository = argv.[1]
+  let repository = scanRepositoryIntoCache pathToRepository
 
   let protocol = parts.[0]
   let ipaddress = parts.[1].Trim([|'/'|])
@@ -123,7 +124,7 @@ let main argv =
   let app =
     choose
       [ GET >=> path "/" >=> OK "<h1>ClientDeploy Repository</h1><a href='/repo'>Repository Description</a>"
-        GET >=> path "/repo/clientdeploy.zip" >=> Files.sendFile (System.IO.Path.Combine(path_to_repo,"clientdeploy.zip")) false
+        GET >=> path "/repo/clientdeploy.zip" >=> Files.sendFile (System.IO.Path.Combine(pathToRepository,"clientdeploy.zip")) false
         GET >=> path "/repo" >=>  jsonResponse ({ RepositoryDescription.APIv1=(sprintf "%s/apiv1" absolutebase) ; CanonicalBaseUrl = absolutebase })
         GET >=> path "/apiv1" >=>  jsonResponse ({ RepositoryAPIv1.UpdaterUrl=null ; ChannelListUrl=(sprintf "%s/channels" absolutebase) })
         GET >=> path "/channels" >=>  jsonResponse (channels absolutebase repository)

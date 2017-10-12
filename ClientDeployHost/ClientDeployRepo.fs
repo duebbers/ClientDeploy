@@ -2,35 +2,35 @@ namespace ClientDeploy
 
 module RepoParser =
 
-  type VersionConfig =
+  type DotVersionConfigFileStructure =
     { Version : string
       SemVer : Semver.SemVersion
       Deprecated : bool
       ReleaseNotes : string }
 
-  type ChannelConfig =
+  type DotChannelConfigFileStucture =
     { Name:string
       Displayname : string
       Hidden : bool
       Description : string }
 
-  type RepositoryConfig =
+  type DotRepositoryConfigFileStructure =
     { Key : string }
 
-  type Repository =
-    { Root : string
-      Config : RepositoryConfig
+  type CachedRepository =
+    { RootFolder : string
+      Configuration : DotRepositoryConfigFileStructure
       Channels : Map<string,Channel> }
 
   and Channel =
     { Name : string
-      Config : ChannelConfig
-      Latest : Version option
+      Configuration : DotChannelConfigFileStucture
+      LatestVersion : Version option
       Versions : Map<string,Version> }
 
   and Version =
-    { Config : VersionConfig
-      RepoFiles : (string*string*int) list
+    { Configuration : DotVersionConfigFileStructure
+      FilesInRepository : (string*string*int) list
       Hash : string
       Manifest : Manifests.VersionManifest }
 
@@ -67,24 +67,24 @@ module RepoParser =
     if (not (System.IO.File.Exists(config)))
       then None
       else
-        let config = readJson<VersionConfig> config
+        let config = readJson<DotVersionConfigFileStructure> config
         let config = { config with SemVer = Semver.SemVersion.Parse(config.Version) }
         let config = { config with Version = config.SemVer.ToString() }
         let files = scanFiles path
 
         let manifest =
-          [ Manifests.FolderExpected Manifests.INSTALLTARGET ] @
+          [ Manifests.FolderExpected Manifests.PathPlaceholders.INSTALLTARGET ] @
           ( files |>
             List.map (fun (hash,file,size) ->
-                let filename = System.IO.Path.Combine(Manifests.INSTALLTARGET,System.IO.Path.GetRelativePath(path,file))
+                let filename = System.IO.Path.Combine(Manifests.PathPlaceholders.INSTALLTARGET,System.IO.Path.GetRelativePath(path,file))
                 let resource =
                   { Manifests.Resource.Source="~",hash ; Manifests.Resource.Hash=hash ; Manifests.Resource.Size = size }
                 Manifests.ExactFileExpected (filename,hash,resource)))
 
         let version =
           { Version.Hash=""
-            Config = config
-            RepoFiles = files
+            Configuration = config
+            FilesInRepository = files
             Manifest = { Manifests.VersionManifest.Expectations = manifest } }
         let json = Newtonsoft.Json.JsonConvert.SerializeObject(version,converter)
         let hash = hasher.ComputeHash(System.Text.Encoding.UTF8.GetBytes(json))
@@ -103,17 +103,17 @@ module RepoParser =
     if (not (System.IO.File.Exists(config)))
       then None
       else
-        let config = readJson<ChannelConfig> config
+        let config = readJson<DotChannelConfigFileStucture> config
         let versionlist = scanVersions path
         let versions =
           versionlist
-          |> List.map (fun v -> v.Config.Version,v)
+          |> List.map (fun v -> v.Configuration.Version,v)
           |> Map.ofList
-        let latest = versionlist |> Seq.sortByDescending (fun v -> v.Config.SemVer) |> Seq.tryHead
+        let latest = versionlist |> Seq.sortByDescending (fun v -> v.Configuration.SemVer) |> Seq.tryHead
         Some
           { Channel.Name = config.Name
-            Config = config
-            Latest = latest
+            Configuration = config
+            LatestVersion = latest
             Versions = versions }
 
 
@@ -121,17 +121,17 @@ module RepoParser =
     System.IO.Directory.GetDirectories(basedir)
     |> Seq.choose scanChannel |> Seq.toList
 
-  let scan (basedir:string) : Repository =
+  let scanRepositoryIntoCache (basedir:string) : CachedRepository =
     if (not (System.IO.Directory.Exists basedir)) then failwith (sprintf "Repository folder '%s' not found [CS-001]." basedir)
 
     let config = repoconfig basedir
     if (not (System.IO.File.Exists config)) then failwith (sprintf "Repository folder '%s' is not a valid ClientDeploy Repository [CS-002]." basedir)
-    let config = readJson<RepositoryConfig> config
+    let config = readJson<DotRepositoryConfigFileStructure> config
     let channels =
       scanChannels basedir
       |> List.map (fun ch -> ch.Name,ch)
       |> Map.ofList
 
-    { Root = basedir
-      Config = config
+    { RootFolder = basedir
+      Configuration = config
       Channels = channels }

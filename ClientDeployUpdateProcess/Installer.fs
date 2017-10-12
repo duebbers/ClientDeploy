@@ -31,23 +31,23 @@ module Installer =
     System.Guid(hash).ToString()
 
 
-  let private check_expectations target expectations (kill:int option) (start:(string*string) option) uuid repo product version : (int*InstallerAction) list = 
+  let private check_expectations target expectations (kill:int option) (start:(string*string) option) uuid repo product version : (int*InstallerAction) list =
 
-    let replace (p:string) : string = p.Replace(Manifests.INSTALLTARGET,target)
+    let replace (p:string) : string = p.Replace(Manifests.PathPlaceholders.INSTALLTARGET,target)
 
     let mkFile (p:string) (f:string) : string = System.IO.Path.Combine((replace p),(replace f))
 
     let folders_to_create =
       expectations
       |> List.choose
-          ( function            
+          ( function
             | FolderExpected (p) -> Some (replace p)
             | FileExpected (p,_) -> Some (System.IO.Path.GetDirectoryName((replace p)))
             | ExactFileExpected (p,_,_) -> Some (System.IO.Path.GetDirectoryName((replace p)))
             | _ -> None )
+      |> List.distinct
       |> List.filter (fun p -> System.IO.Directory.Exists p |> not)
       |> List.map (fun p -> 0,(InstallerAction.CreateFolder p))
-      |> List.distinct
 
     let files_to_copy =
       expectations
@@ -55,9 +55,9 @@ module Installer =
           ( function
             | FileExpected (file,{Source=(source,_);Size=size;Hash=hash}) ->
               let file = replace file
-              if System.IO.File.Exists file 
+              if System.IO.File.Exists file
                 then []
-                else 
+                else
                   [ 1,(InstallerAction.DownloadResource (hash,size,source,file))
                     4,(InstallerAction.CreateFileFromResource (file,(source),size,hash))
                     8,(InstallerAction.DeleteTempFile hash) ]
@@ -66,7 +66,7 @@ module Installer =
               if System.IO.File.Exists file
               then
                 let fhash = hashFile file
-                if hash=fhash 
+                if hash=fhash
                 then []
                 else 
                   [ 1,(InstallerAction.DownloadResource (hash,size,source,file))
@@ -74,7 +74,7 @@ module Installer =
                     4,(InstallerAction.CreateFileFromResource (file,(source),size,hash))
                     8,(InstallerAction.DeleteTempFile hash)
                     8,(InstallerAction.DeleteTempFile (hash+".backup")) ]
-              else 
+              else
                   [ 1,(InstallerAction.DownloadResource (hash,size,source,file))
                     4,(InstallerAction.CreateFileFromResource (file,(source),size,hash))
                     8,(InstallerAction.DeleteTempFile hash) ]
@@ -156,12 +156,12 @@ module Installer =
 
 
 
-    if simulate 
+    if simulate
     then render steps
     else execute steps
 
     Thread.Sleep(3000)
 
     0
-      
+
 
