@@ -45,7 +45,8 @@ let private versionDetails absolutebase ch (v:Version) =
     Deprecated = v.Configuration.Deprecated
     Manifest = { v.Manifest with Expectations = rewriteExpectations } }
 
-let private lookup repo ch v res =
+let private lookup (getrepo:unit->CachedRepository) ch v res =
+  let repo = getrepo ()
   let (a,b,c) =
     ( maybe {
         let! channel = repo.Channels |> Map.tryFind ch
@@ -55,21 +56,24 @@ let private lookup repo ch v res =
       }).Value
   b
 
-let private channelversion absolutebase repo ch v =
+let private channelversion absolutebase (getrepo:unit->CachedRepository) ch v =
+  let repo = getrepo ()
   maybe {
     let! channel = repo.Channels |> Map.tryFind ch
     let! version = channel.Versions |> Map.tryFind v
     return versionDetails absolutebase ch version
   }
 
-let private channellatest absolutebase repo ch =
+let private channellatest absolutebase (getrepo:unit->CachedRepository) ch =
+  let repo = getrepo ()
   maybe {
     let! channel = repo.Channels |> Map.tryFind ch
     let! latest = channel.LatestVersion
     return versionDetails absolutebase ch latest
   }
 
-let channel absolutebase (repo:CachedRepository) (ch:string) =
+let channel absolutebase (getrepo:unit->CachedRepository) (ch:string) =
+  let repo = getrepo ()
   repo.Channels
   |> Map.tryFind ch
   |> Option.map (fun ch ->
@@ -85,7 +89,8 @@ let channel absolutebase (repo:CachedRepository) (ch:string) =
         LatestVersionUrl = ch.LatestVersion |> Option.map (fun _ -> sprintf "%s/%s" (mkChannelUrl absolutebase ch.Name) "latest")
         Versions = versions } )
 
-let channels absolutebase (repo:CachedRepository) =
+let channels absolutebase (getrepo:unit->CachedRepository) =
+  let repo = getrepo ()
   repo.Channels
   |> Map.toSeq
   |> Seq.map (fun (_,ch) ->
@@ -105,6 +110,20 @@ let jsonResponseOpt info =
   | None -> RequestErrors.NOT_FOUND (sprintf "Sorry, the requested resource was not found (%s)." info)
 
 
+let homepage absolutebase =
+  [ "<h1>ClientDeploy Repository</h1>"
+    "<div><a href='/repo'>Repository Description</a></div>"
+    sprintf "<div style='margin-top:24px;'><button onclick='window.location.href=\"%s/refresh\"'>Refresh repository cache</button></div>" absolutebase ]
+  |> (fun lines -> System.String.Join(System.Environment.NewLine, lines))
+
+
+module RepositoryCache =
+  let mutable private cache : CachedRepository option = None
+  let update pathToRepository =
+    cache <- Some (scanRepositoryIntoCache pathToRepository)
+  let get () =
+    cache.Value
+
 [<EntryPoint>]
 let main argv =
 
@@ -113,7 +132,8 @@ let main argv =
   let absolutebase = argv.[0]
   let parts = absolutebase.Split(":")
   let pathToRepository = argv.[1]
-  let repository = scanRepositoryIntoCache pathToRepository
+
+  RepositoryCache.update pathToRepository
 
   let protocol = parts.[0]
   let ipaddress = parts.[1].Trim([|'/'|])
@@ -123,15 +143,16 @@ let main argv =
 
   let app =
     choose
-      [ GET >=> path "/" >=> OK "<h1>ClientDeploy Repository</h1><a href='/repo'>Repository Description</a>"
+      [ GET >=> path "/" >=> OK (homepage absolutebase)
+        GET >=> path "/refresh" >=> warbler (fun ctx -> (RepositoryCache.update pathToRepository) ; Redirection.FOUND (sprintf "%s/" absolutebase))
         GET >=> path "/repo/clientdeploy.zip" >=> Files.sendFile (System.IO.Path.Combine(pathToRepository,"clientdeploy.zip")) false
         GET >=> path "/repo" >=>  jsonResponse ({ RepositoryDescription.APIv1=(sprintf "%s/apiv1" absolutebase) ; CanonicalBaseUrl = absolutebase })
         GET >=> path "/apiv1" >=>  jsonResponse ({ RepositoryAPIv1.UpdaterUrl=null ; ChannelListUrl=(sprintf "%s/channels" absolutebase) })
-        GET >=> path "/channels" >=>  jsonResponse (channels absolutebase repository)
-        GET >=> pathScan "/channel/%s/latest" (fun (ch) -> jsonResponseOpt "A" (channellatest absolutebase repository ch) )
-        GET >=> pathScan "/channel/%s/version/%s/resource/%s.dat" (fun (ch,v,res) -> Files.sendFile (lookup repository ch v res) true )
-        GET >=> pathScan "/channel/%s/version/%s" (fun (ch,v) -> jsonResponseOpt "B" (channelversion absolutebase repository ch v) )
-        GET >=> pathScan "/channel/%s" (fun ch -> jsonResponseOpt "C" (channel absolutebase repository ch) ) ]
+        GET >=> path "/channels" >=>  jsonResponse (channels absolutebase RepositoryCache.get)
+        GET >=> pathScan "/channel/%s/latest" (fun (ch) -> jsonResponseOpt "A" (channellatest absolutebase RepositoryCache.get ch) )
+        GET >=> pathScan "/channel/%s/version/%s/resource/%s.dat" (fun (ch,v,res) -> Files.sendFile (lookup RepositoryCache.get ch v res) true )
+        GET >=> pathScan "/channel/%s/version/%s" (fun (ch,v) -> jsonResponseOpt "B" (channelversion absolutebase RepositoryCache.get ch v) )
+        GET >=> pathScan "/channel/%s" (fun ch -> jsonResponseOpt "C" (channel absolutebase RepositoryCache.get ch) ) ]
   startWebServer { defaultConfig with bindings = [ HttpBinding.createSimple Protocol.HTTP ipaddress port ] } app
   System.Console.ReadLine() |> ignore
   0
