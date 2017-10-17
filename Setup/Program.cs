@@ -39,7 +39,20 @@ namespace Setup
             }
 
             Console.Out.WriteLine("Extracting ClientDeploy Installer");
-            ZipFile.ExtractToDirectory(bootstrapper,cd);
+            ZipArchive archive = ZipFile.OpenRead(bootstrapper);
+            foreach (var archivedfile in archive.Entries)
+            {
+                string path = Path.Combine(cd, archivedfile.FullName);
+                if (archivedfile.Name == "")
+                {
+                    Console.Out.WriteLine($"... Creating Directory {path}");
+                    Directory.CreateDirectory(path);
+                    continue;
+                }
+                Console.Out.WriteLine($"... {(File.Exists(path) ? "Overwriting" : "Extracting")} File {archivedfile.FullName}" );
+                archivedfile.ExtractToFile(path, true);
+            }
+            archive.Dispose();
 
             Console.Out.WriteLine("Removing temporary file");
             File.Delete(bootstrapper);
