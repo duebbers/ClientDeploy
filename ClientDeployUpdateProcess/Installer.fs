@@ -31,7 +31,7 @@ module Installer =
     System.Guid(hash).ToString()
 
 
-  let private check_expectations target expectations (kill:int option) (start:(string*string) option) uuid repo product version : (int*InstallerAction) list = 
+  let private check_expectations target expectations (kill:int option) (start:(string*string) option) uuid repo product version : (int*InstallerAction) list =
 
     let replace (p:string) : string = p.Replace(Manifests.INSTALLTARGET,target)
 
@@ -40,7 +40,7 @@ module Installer =
     let folders_to_create =
       expectations
       |> List.choose
-          ( function            
+          ( function
             | FolderExpected (p) -> Some (replace p)
             | FileExpected (p,_) -> Some (System.IO.Path.GetDirectoryName((replace p)))
             | ExactFileExpected (p,_,_) -> Some (System.IO.Path.GetDirectoryName((replace p)))
@@ -55,9 +55,9 @@ module Installer =
           ( function
             | FileExpected (file,{Source=(source,_);Size=size;Hash=hash}) ->
               let file = replace file
-              if System.IO.File.Exists file 
+              if System.IO.File.Exists file
                 then []
-                else 
+                else
                   [ 1,(InstallerAction.DownloadResource (hash,size,source,file))
                     4,(InstallerAction.CreateFileFromResource (file,(source),size,hash))
                     8,(InstallerAction.DeleteTempFile hash) ]
@@ -66,30 +66,30 @@ module Installer =
               if System.IO.File.Exists file
               then
                 let fhash = hashFile file
-                if hash=fhash 
+                if hash=fhash
                 then []
-                else 
+                else
                   [ 1,(InstallerAction.DownloadResource (hash,size,source,file))
                     3,(InstallerAction.Backup (file,hash+".backup"))
                     4,(InstallerAction.CreateFileFromResource (file,(source),size,hash))
                     8,(InstallerAction.DeleteTempFile hash)
                     8,(InstallerAction.DeleteTempFile (hash+".backup")) ]
-              else 
+              else
                   [ 1,(InstallerAction.DownloadResource (hash,size,source,file))
                     4,(InstallerAction.CreateFileFromResource (file,(source),size,hash))
                     8,(InstallerAction.DeleteTempFile hash) ]
-                
+
             | _ -> [])
 
     let other =
         [ kill |> Option.map (fun pid -> 1,(InstallerAction.KillProcess pid))
           start |> Option.map (fun cmd -> 9,(InstallerAction.StartProcess cmd))
-          (if product<> "ClientDeployUpdateProcess" then Some (8,(InstallerAction.WriteConfig(".clientdeploy.config",[ ("uuid",uuid) ; ("repo",repo) ; ("product",product) ; ("version",version) ]))) else None) ] 
+          (if product<> "ClientDeployUpdateProcess" then Some (8,(InstallerAction.WriteConfig(".clientdeploy.config",[ ("uuid",uuid) ; ("repo",repo) ; ("product",product) ; ("version",version) ]))) else None) ]
 
     let candidates = [ folders_to_create ; files_to_copy ] |> List.concat
     let errors = candidates |> List.filter (function | (_,Error _) -> true | _ -> false)
-    if (errors |> List.isEmpty |> not) 
-    then errors 
+    if (errors |> List.isEmpty |> not)
+    then errors
     elif (candidates |> List.isEmpty)
     then []
     else ((List.choose id other) @ candidates)
@@ -100,7 +100,7 @@ module Installer =
     | Error info -> printfn "Unable to proceed with installation: '%s'" info
     | CreateFolder path -> printfn "Create folder '%s'" path
     | DownloadResource (hash,size,source,file) -> printfn "Download file '%s' (%d bytes) from %s" file size  source
-    | CreateFileFromResource (file,(_),_,_) -> printfn "Copy file '%s'" file 
+    | CreateFileFromResource (file,(_),_,_) -> printfn "Copy file '%s'" file
     | Backup (f,t) -> printfn "Backup file %s" f
     | DeleteFile (file) -> printfn "Delete file '%s'" file
     | DeleteTempFile (file) -> printfn "Delete temporary file '%s'" file
@@ -120,7 +120,7 @@ module Installer =
     renderStep step
     match step with
     | Error _ -> ()
-    | KillProcess pid -> 
+    | KillProcess pid ->
        let p = System.Diagnostics.Process.GetProcessById(pid)
        if p<>null
         then
@@ -142,10 +142,12 @@ module Installer =
       System.IO.File.WriteAllLines(file,(kvl |> List.map (fun (k,v)->sprintf "%s|%s" k v)))
 
 
-  let private execute steps =
+  let private execute =
     use wc = new System.Net.WebClient()
-    [0..9] |> List.iter(fun level -> steps |> List.filter (fun (l,_)->l=level) |> List.iter (snd>>(executeStep wc)))
-    
+    function
+    | [] -> printfn "Nothing to do..."
+    | steps -> [0..9] |> List.iter(fun level -> steps |> List.filter (fun (l,_)->l=level) |> List.iter (snd>>(executeStep wc)))
+
 
   let run (repo:string) (product:string) (version:SemVersion option) (target:string) (simulate:bool) kill start uuid =
     let version = version |> Option.defaultValue (RepoClient.latest_version repo product)
@@ -156,12 +158,12 @@ module Installer =
 
 
 
-    if simulate 
+    if simulate
     then render steps
     else execute steps
 
     Thread.Sleep(3000)
 
     0
-      
+
 
