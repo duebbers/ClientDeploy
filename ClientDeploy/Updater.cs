@@ -68,7 +68,7 @@ namespace ClientDeploy
                 if (!config.ContainsKey("repo"))
                 {
                     _onWarning(
-                        $"Configuration file for ClientDeploy Installation has no uuid. This software will not receive automated updates!");
+                        $"Configuration file for ClientDeploy Installation has no repo. This software will not receive automated updates!");
                     return;
                 }
                 if (!config.ContainsKey("product"))
